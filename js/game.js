@@ -66,6 +66,23 @@ let roundLocked = false;
 let savedLevelProgress = {};
 let restartBtn = null;
 
+function loadRoundProgressFromStorage() {
+  try {
+    const raw = localStorage.getItem("roundProgress");
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      savedLevelProgress = parsed;
+    }
+  } catch (e) {}
+}
+
+function saveRoundProgressToStorage() {
+  try {
+    localStorage.setItem("roundProgress", JSON.stringify(savedLevelProgress));
+  } catch (e) {}
+}
+
 function calculateScoreFromStates(states) {
   if (!currentConfig) return 0;
   let total = 0;
@@ -320,6 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("keydown", handleAdminToggle);
 
+  loadRoundProgressFromStorage();
   setupLevelMenu();
 });
 
@@ -419,6 +437,7 @@ function startLevel(levelId, reset = false, startFromRound = 1) {
 
   if (reset) {
     delete savedLevelProgress[levelId];
+    saveRoundProgressToStorage();
     roundStates = [];
     score = 0;
     currentRound = startFromRound;
@@ -963,6 +982,7 @@ function persistLevelProgress() {
     roundStates: cloned,
     score,
   };
+  saveRoundProgressToStorage();
 }
 
 function cloneRoundStates(states) {

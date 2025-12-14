@@ -136,8 +136,10 @@
 }
 
 .end-level-wrapper {
-  margin-top: auto;
+  margin: 0 auto;
+  margin-bottom: 0;
   text-align: right;
+
 }
 
 .rounds-panel {
