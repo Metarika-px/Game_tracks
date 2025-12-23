@@ -15,6 +15,7 @@ img {
   font-size: 14px;
   font-weight: 600;
   transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s;
+  user-select: none;
 }
 
 .btn-primary {

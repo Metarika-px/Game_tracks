@@ -367,9 +367,12 @@
   box-shadow: 0 4px 10px rgba(33, 150, 243, 0.35);
   border: 1px solid rgba(33, 150, 243, 0.7);
   cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.2s;
 }
 .btn-leaderboard:hover {
   background: #42a5f5;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(33, 150, 243, 0.45);
 }
 
 .difficulty-toggle {
