@@ -1,4 +1,4 @@
-const LEVELS = {
+﻿const LEVELS = {
   easy: {
     id: "easy",
     name: "Легко",
@@ -25,15 +25,17 @@ const LEVELS = {
   },
 };
 
-// Порог очков для разблокировки уровней
-const UNLOCK_SCORES = {
-  normal: 30,
-  hard: 40,
+const MODE_TITLES = {
+  quiz: "Викторина",
+  maze: "Марафон лабиринтов",
+  reaction: "Реакция",
 };
 
-let forceUnlockLevels = false; // админка
+const TIME_CLEAR_BONUS = 15;
+
 let currentLevelId = "easy";
 let currentConfig = LEVELS.easy;
+let currentGameMode = "quiz"; // quiz | maze | reaction
 
 let currentRound = 1;
 let score = 0;
@@ -65,6 +67,15 @@ let viewingRound = null;
 let roundLocked = false;
 let savedLevelProgress = {};
 let restartBtn = null;
+let instructionModal = null;
+let instructionCloseBtn = null;
+let confirmBtn = null;
+let optionMotionFrame = null;
+let optionMotionData = new Map();
+let reactionTimerId = null;
+let reactionSpawns = 0;
+let reactionOptions = [];
+let reactionLastId = null;
 
 function calculateScoreFromStates(states) {
   if (!currentConfig) return 0;
@@ -82,125 +93,49 @@ function calculateScoreFromStates(states) {
 
 // Подбираем модификаторы сложности для картинок
 function getRandomModifierForRound(round) {
-  const midMods = [
-    "mod-rot-15",
-    "mod-rot--15",
-    "mod-rot-30",
-    "mod-small",
-    "mod-tilt",
-  ];
+  const midMods = ["mod-rot-15", "mod-rot--15", "mod-rot-30", "mod-tilt"];
   const maskMods = ["mod-mask"];
   const blurMods = ["mod-blur"];
   const cutMods = ["mod-cut"];
   const shakeMods = ["mod-shake"];
   const spinMods = ["mod-spin"];
+  const animMods = [...shakeMods, ...spinMods];
+  const shapeMods = [...cutMods, ...maskMods];
 
-  // случайный элемент из массива
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // собрать пул классов и вернуть один случайный
-  function buildMods(arrayOfGroups) {
-    const pool = arrayOfGroups.flat();
-    if (!pool.length) return "";
-    return pick(pool);
+  // количество модификаторов: раунд - 1 (первый без), максимум 3
+  let count = Math.max(0, round - 1);
+  if (count > 3) count = 3;
+  if (count === 0) return "";
+
+  // базовый пул по сложности
+  let pool = [...midMods, ...maskMods];
+  if (currentLevelId !== "easy") {
+    pool.push(...blurMods, ...cutMods);
+  }
+  // с 3-го раунда добавляем анимации с повышенным весом
+  if (round >= 3) {
+    pool.push(...animMods, ...animMods);
+    pool.push(...shapeMods);
   }
 
-  // ЛЕГКО
-  if (currentLevelId === "easy") {
-    if (round === 1) {
-      return ""; // без модификаторов
+  const seen = new Set();
+  const result = [];
+  while (result.length < count && pool.length) {
+    const m = pick(pool);
+    if (!seen.has(m)) {
+      seen.add(m);
+      result.push(m);
     }
-    if (round === 2 || round === 3) {
-      // лёгкие повороты/масштаб
-      return buildMods([midMods]);
-    }
-    if (round === 4) {
-      // повороты/масштаб + иногда маска
-      return buildMods([midMods, midMods, maskMods]); // маска реже
-    }
-    // round 5
-    return buildMods([midMods, maskMods, spinMods]); // маска почти всегда
   }
 
-  // НОРМАЛЬНО
-  if (currentLevelId === "normal") {
-    if (round === 1) {
-      // сразу лёгкие модификаторы
-      return buildMods([midMods]);
-    }
-    if (round === 2) {
-      // повороты + маска
-      return buildMods([midMods, maskMods, spinMods]);
-    }
-    if (round === 3) {
-      // повороты + маска или блюр
-      return buildMods([midMods, maskMods, blurMods]);
-    }
-    if (round === 4) {
-      return buildMods([
-        midMods,
-        maskMods,
-        maskMods,
-        blurMods,
-        shakeMods,
-        spinMods,
-      ]);
-    }
-    // round 5 — добавляем обрезанный угол и shake
-    return buildMods([
-      midMods,
-      maskMods,
-      blurMods,
-      cutMods,
-      shakeMods,
-      spinMods,
-    ]);
+  // гарантируем хотя бы одну анимацию с 3-го раунда
+  if (round >= 3 && !result.some((m) => animMods.includes(m))) {
+    result[0] = pick(animMods);
   }
 
-  // СЛОЖНО
-  // на сложном всегда есть минимум маска/блюр, часто ещё и cut, shake или spin
-  if (currentLevelId === "hard") {
-    if (round === 1) {
-      return buildMods([midMods, maskMods, blurMods]);
-    }
-    if (round === 2) {
-      return buildMods([midMods, maskMods, blurMods, cutMods]);
-    }
-    if (round === 3) {
-      return buildMods([
-        midMods,
-        midMods,
-        maskMods,
-        blurMods,
-        cutMods,
-        shakeMods,
-      ]);
-    }
-    if (round === 4) {
-      return buildMods([
-        midMods,
-        maskMods,
-        maskMods,
-        blurMods,
-        cutMods,
-        shakeMods,
-      ]);
-    }
-    // round 5
-    return buildMods([
-      midMods,
-      midMods,
-      maskMods,
-      blurMods,
-      cutMods,
-      cutMods,
-      shakeMods,
-      spinMods,
-    ]);
-  }
-
-  // на всякий случай, если что-то пойдёт не так
-  return "";
+  return result.join(" ");
 }
 
 // таймер
@@ -245,7 +180,7 @@ function handleTimeExpired() {
     totalRounds: currentConfig.rounds,
   });
 
-  setCurrentGameState(score, currentConfig.id);
+  setCurrentGameState(score, getProgressKey());
 }
 
 // инициализация страницы
@@ -279,6 +214,9 @@ document.addEventListener("DOMContentLoaded", () => {
   roundSelectCancel = document.getElementById("round-select-cancel");
   roundsListEl = document.getElementById("rounds-list");
   restartBtn = document.getElementById("restart-round-btn");
+  instructionModal = document.getElementById("instruction-modal");
+  instructionCloseBtn = document.getElementById("instruction-close-btn");
+  confirmBtn = document.getElementById("confirm-answer-btn");
   if (modalReplayBtn) {
     modalReplayBtn.addEventListener("click", () => {
       hideEndModal();
@@ -290,7 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modalNextBtn.addEventListener("click", () => {
       if (!nextLevelToStart) return;
       hideEndModal();
-      startLevel(nextLevelToStart, true);
+      startLevel(nextLevelToStart, true, 1, currentGameMode);
     });
   }
 
@@ -316,93 +254,166 @@ document.addEventListener("DOMContentLoaded", () => {
   if (restartBtn) {
     restartBtn.addEventListener("click", () => restartCurrentRound());
   }
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", () => handleConfirmOption());
+  }
+  if (instructionCloseBtn) {
+    instructionCloseBtn.addEventListener("click", hideInstructionModal);
+  }
 
-  document.addEventListener("keydown", handleAdminToggle);
+  document.addEventListener("keydown", handleHelpToggle);
 
   loadRoundProgressFromStorage();
   setupLevelMenu();
+  initFloatingBackground();
 });
 
-function handleAdminToggle(event) {
+function handleHelpToggle(event) {
   if (!event.key) return;
   const key = event.key.toLowerCase();
-  if (key !== "o" && key !== "щ") return;
-  forceUnlockLevels = !forceUnlockLevels;
-  setupLevelMenu();
+  if (key === "i" || key === "ш") {
+    showInstructionModal();
+  }
 }
 
 // меню выбора уровня
 function setupLevelMenu() {
-  const bestEasy = getBestScoreForLevel("easy");
-  const bestNormal = getBestScoreForLevel("normal");
-
-  const easyBtn = document.getElementById("level-easy-btn");
-  const normalBtn = document.getElementById("level-normal-btn");
-  const hardBtn = document.getElementById("level-hard-btn");
   const hint = document.getElementById("level-hint");
-  const leaderboardBtn = document.getElementById("leaderboard-btn");
-  const defaultHint =
-    'Уровень "Нормально" и "Сложно" откроются после набора нужного количества очков.';
-
   if (hint) {
-    if (forceUnlockLevels) {
-      hint.textContent = 'Админ режим: уровни разблокированы (клавиша "O").';
-    } else {
-      hint.textContent = defaultHint;
-    }
+    hint.textContent = 'Чтоб открыть заметки следопыта, нажми на клавишу "I".';
   }
 
-  if (easyBtn) {
-    easyBtn.disabled = false;
-    easyBtn.classList.remove("level-locked");
-    easyBtn.title = 'Уровень "Легко"';
-    easyBtn.onclick = () => requestRoundStart("easy");
-  }
-
-  if (normalBtn) {
-    if (forceUnlockLevels || bestEasy >= UNLOCK_SCORES.normal) {
-      normalBtn.disabled = false;
-      normalBtn.classList.remove("level-locked");
-      normalBtn.title = 'Уровень "Нормально" доступен';
-      normalBtn.onclick = () => requestRoundStart("normal");
-    } else {
-      normalBtn.disabled = true;
-      normalBtn.classList.add("level-locked");
-      normalBtn.title = `Откроется, когда вы наберёте не менее ${UNLOCK_SCORES.normal} очков на уровне "Легко".`;
-      if (hint && !forceUnlockLevels) {
-        hint.textContent = `Уровень "Нормально" откроется, когда вы наберёте не менее ${UNLOCK_SCORES.normal} очков на уровне "Легко".`;
+  const diffButtons = document.querySelectorAll("#difficulty-toggle .diff-btn");
+  diffButtons.forEach((btn) => {
+    btn.onclick = () => {
+      diffButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const diff = btn.dataset.diff;
+      if (diff && LEVELS[diff]) {
+        currentLevelId = diff;
+        currentConfig = LEVELS[diff];
+        updateBestScoreLabel();
       }
-    }
-  }
+    };
+  });
 
-  if (hardBtn) {
-    if (forceUnlockLevels || bestNormal >= UNLOCK_SCORES.hard) {
-      hardBtn.disabled = false;
-      hardBtn.classList.remove("level-locked");
-      hardBtn.title = 'Уровень "Сложно" доступен';
-      hardBtn.onclick = () => requestRoundStart("hard");
-    } else {
-      hardBtn.disabled = true;
-      hardBtn.classList.add("level-locked");
-      hardBtn.title = `Откроется, когда вы наберёте не менее ${UNLOCK_SCORES.hard} очков на уровне "Нормально".`;
-      if (hint && !forceUnlockLevels && bestEasy >= UNLOCK_SCORES.normal) {
-        hint.textContent = `Уровень "Сложно" откроется, когда вы наберёте не менее ${UNLOCK_SCORES.hard} очков на уровне "Нормально".`;
-      }
-    }
-  }
-
+  const leaderboardBtn = document.getElementById("leaderboard-btn");
   if (leaderboardBtn) {
     leaderboardBtn.onclick = () => {
       window.location.href = "results.html";
     };
   }
+
+  const quizBtn = document.getElementById("mode-quiz-btn");
+  const mazeBtn = document.getElementById("mode-maze-btn");
+  const reactionBtn = document.getElementById("mode-reaction-btn");
+
+  const modeButtons = [quizBtn, mazeBtn, reactionBtn].filter(Boolean);
+  const setModeActive = (mode) => {
+    modeButtons.forEach((btn) =>
+      btn.classList.toggle("mode-btn-active", btn.dataset.modeBtn === mode)
+    );
+    if (mode && MODE_TITLES[mode]) {
+      currentGameMode = mode;
+      updateBestScoreLabel();
+    }
+  };
+
+  modeButtons.forEach((btn) => {
+    const mode = btn.dataset.modeBtn;
+    btn.onclick = () => {
+      setModeActive(mode);
+    };
+    btn.ondblclick = () => {
+      setModeActive(mode);
+      startGameMode(mode);
+    };
+  });
+
+  setModeActive(currentGameMode);
+
+  updateBestScoreLabel();
 }
 function showLevelSelectMenu() {
+  stopGameplayTimers();
   const selectBlock = document.getElementById("level-select");
   const gameWrapper = document.getElementById("game-main-wrapper");
   if (selectBlock) selectBlock.classList.remove("hidden");
   if (gameWrapper) gameWrapper.classList.add("hidden");
   setupLevelMenu();
+}
+
+function startGameMode(mode) {
+  currentGameMode = mode || "quiz";
+  startLevel(currentLevelId, true, 1, currentGameMode);
+}
+
+function updateBestScoreLabel() {
+  const label = document.getElementById("best-score-label");
+  if (!label) return;
+  const best = getBestScoreForLevel(currentLevelId, currentGameMode);
+  const modeName = MODE_TITLES[currentGameMode] || currentGameMode;
+  const levelName = LEVELS[currentLevelId]?.name || currentLevelId;
+  label.textContent = `Лучший результат (${modeName}, ${levelName}): ${best}`;
+}
+
+function initFloatingBackground() {
+  let container = document.getElementById("global-floating-bg");
+  if (!container || !Array.isArray(ANIMALS)) return;
+  container.innerHTML = "";
+  const count = 14;
+  for (let i = 0; i < count; i++) {
+    const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+    const useTrack = Math.random() > 0.5 && animal.track;
+    const src = useTrack ? animal.track : animal.src;
+    if (!src) continue;
+    const img = document.createElement("img");
+    img.src = src;
+    img.className = "floating-item";
+    const size = 90 + Math.random() * 70;
+    img.style.width = `${size}px`;
+    img.style.height = "auto";
+    const opacity = 0.25 + Math.random() * 0.35;
+    img.style.opacity = opacity.toFixed(2);
+
+    const w = window.innerWidth || 1200;
+    const h = window.innerHeight || 800;
+
+    const edge = Math.floor(Math.random() * 4); // 0 top,1 right,2 bottom,3 left
+    let startX, startY, endX, endY;
+    if (edge === 0) {
+      startX = Math.random() * 100;
+      startY = -30;
+      endX = Math.random() * 100;
+      endY = 130;
+    } else if (edge === 1) {
+      startX = 130;
+      startY = Math.random() * 100;
+      endX = -30;
+      endY = Math.random() * 100;
+    } else if (edge === 2) {
+      startX = Math.random() * 100;
+      startY = 130;
+      endX = Math.random() * 100;
+      endY = -30;
+    } else {
+      startX = -30;
+      startY = Math.random() * 100;
+      endX = 130;
+      endY = Math.random() * 100;
+    }
+
+    const dxPx = ((endX - startX) / 100) * w;
+    const dyPx = ((endY - startY) / 100) * h;
+
+    img.style.left = `${startX}%`;
+    img.style.top = `${startY}%`;
+    img.style.setProperty("--dx", `${dxPx}px`);
+    img.style.setProperty("--dy", `${dyPx}px`);
+    img.style.animationDuration = `${18 + Math.random() * 14}s`;
+    img.style.animationDelay = `${Math.random() * 6}s`;
+    container.appendChild(img);
+  }
 }
 
 function getOptionsCountForLevel(levelId) {
@@ -411,22 +422,32 @@ function getOptionsCountForLevel(levelId) {
   return 5;
 }
 // старт конкретного уровня
-function startLevel(levelId, reset = false, startFromRound = 1) {
+function startLevel(
+  levelId,
+  reset = false,
+  startFromRound = 1,
+  gameMode = null
+) {
   currentLevelId = levelId;
   currentConfig = LEVELS[levelId];
+  if (gameMode) {
+    currentGameMode = gameMode;
+  }
   currentCorrectId = null;
   selectedOptionId = null;
   viewingRound = null;
   roundLocked = false;
 
+  const progressKey = getProgressKey(levelId, currentGameMode);
+
   if (reset) {
-    delete savedLevelProgress[levelId];
+    delete savedLevelProgress[progressKey];
     saveRoundProgressToStorage();
     roundStates = [];
     score = 0;
     currentRound = startFromRound;
   } else {
-    const saved = savedLevelProgress[levelId];
+    const saved = savedLevelProgress[progressKey];
     if (saved && saved.roundStates && saved.roundStates.length) {
       roundStates = cloneRoundStates(saved.roundStates);
       score = calculateScoreFromStates(roundStates);
@@ -446,7 +467,10 @@ function startLevel(levelId, reset = false, startFromRound = 1) {
 
   // обновляем заголовки
   const levelLabel = document.getElementById("level-label");
-  if (levelLabel) levelLabel.textContent = currentConfig.name;
+  if (levelLabel)
+    levelLabel.textContent = `${
+      MODE_TITLES[currentGameMode] || currentGameMode
+    } / ${currentConfig.name}`;
 
   uiUpdateHeader({
     playerName: getCurrentPlayerName(),
@@ -482,7 +506,15 @@ function startRound() {
       setQuestionText(existing.questionType || "track");
       uiShowOwner(existing.owner, existing.questionType || "track");
       renderRoundFromState(existing, false);
+      if (!isMazeMode() && currentGameMode === "quiz") {
+        applyQuizMotion(currentRound);
+      } else {
+        resetOptionMotion();
+      }
       updateRoundListUI();
+      if (isMazeMode()) {
+        launchMazeForCurrentRound();
+      }
       return;
     } else {
       viewingRound = currentRound;
@@ -497,12 +529,20 @@ function startRound() {
     }
   }
 
-  const owner = getRandomItem(ANIMALS);
+  // стараемся не повторять вопросы в рамках уровня
+  const usedOwners = roundStates
+    .filter((s) => s && s.owner && s.owner.id)
+    .map((s) => s.owner.id);
+  const owner = getUniqueOwner(ANIMALS, usedOwners) || getRandomItem(ANIMALS);
   currentCorrectId = owner.id;
   selectedOptionId = null;
   roundLocked = false;
 
-  const questionType = isMazeMode() || Math.random() < 0.5 ? "track" : "animal";
+  const questionType = isMazeMode()
+    ? "track"
+    : Math.random() < 0.5
+    ? "track"
+    : "animal";
 
   setQuestionText(questionType);
   uiShowOwner(owner, questionType);
@@ -561,11 +601,28 @@ function startRound() {
   }
 
   const mode = isMazeMode() ? "maze" : "click";
+  // реакция - отдельный режим
+  const isReaction = currentGameMode === "reaction";
+  if (isReaction) {
+    const desired = getReactionOptionsCount(currentLevelId);
+    const correctOpt = options.find((o) => o.correct);
+    const wrong = shuffle(options.filter((o) => !o.correct));
+    const limited = [correctOpt, ...wrong.slice(0, Math.max(0, desired - 1))].filter(
+      Boolean
+    );
+    options = shuffle(limited);
+  }
+  const reactionConfig = {
+    ttl: getReactionTTL(currentRound, currentLevelId),
+    spawnInterval: getReactionSpawnInterval(currentRound, currentLevelId),
+    maxSpawns: getReactionMaxSpawns(currentRound, currentLevelId),
+  };
+
   roundStates[currentRound] = {
     round: currentRound,
     owner,
     options,
-    mode,
+    mode: isReaction ? "reaction" : mode,
     questionType,
     correctId: owner.id,
     selectedId: null,
@@ -573,36 +630,34 @@ function startRound() {
   };
   viewingRound = null;
 
-  renderRoundFromState(roundStates[currentRound], false);
+  renderRoundFromState(roundStates[currentRound], false, {
+    reactionConfig: isReaction ? reactionConfig : null,
+  });
+  if (!isReaction) {
+    applyQuizMotion(currentRound);
+  } else {
+    resetOptionMotion();
+  }
   updateRoundListUI();
   persistLevelProgress();
 
   if (isMazeMode()) {
-    startMazePhase({
-      rows: 3,
-      cols: 3,
-      onDropToStart: (trackId) => {
-        // игрок бросил след в стартовую клетку
-        selectedOptionId = trackId;
-        const cssClass = getOptionClassForTrack(trackId);
-        setMazeCursorImage(trackId, cssClass);
-      },
-      onSuccess: () => {
-        // лабиринт пройден — проверяем, правильный ли след
-        checkAnswer();
-      },
-      onFail: () => {
-        // задел стену — считаем попытку провальной
-        selectedOptionId = "__wrong__";
-        checkAnswer();
-      },
-    });
+    launchMazeForCurrentRound();
   }
 }
 
-function renderRoundFromState(state, viewOnly = false) {
+function renderRoundFromState(state, viewOnly = false, extra = {}) {
   if (!state) return;
   uiClearSelection();
+  if (viewOnly) {
+    resetOptionMotion();
+  }
+  const showConfirm =
+    currentGameMode === "quiz" && !viewOnly && state.result === null;
+  if (confirmBtn) {
+    confirmBtn.disabled = !showConfirm;
+    confirmBtn.style.display = showConfirm ? "inline-flex" : "none";
+  }
 
   currentCorrectId = state.correctId;
   selectedOptionId = viewOnly ? state.selectedId : null;
@@ -632,6 +687,10 @@ function renderRoundFromState(state, viewOnly = false) {
     applyRoundSelectionState(state);
   }
 
+  if (state.mode === "reaction" && !viewOnly) {
+    startReactionFlow(state, extra?.reactionConfig || {});
+  }
+
   const hint = document.getElementById("view-mode-hint");
   if (hint) {
     if (viewOnly) {
@@ -640,6 +699,124 @@ function renderRoundFromState(state, viewOnly = false) {
       hint.classList.add("hidden");
     }
   }
+}
+
+function resetOptionMotion() {
+  if (optionMotionFrame) {
+    cancelAnimationFrame(optionMotionFrame);
+    optionMotionFrame = null;
+  }
+  optionMotionData.clear();
+  document.querySelectorAll(".track-option").forEach((el) => {
+    el.classList.remove("option-float");
+    el.style.animationDuration = "";
+    el.style.animationDelay = "";
+    el.style.setProperty("--dx", "");
+    el.style.setProperty("--dy", "");
+    el.style.left = "";
+    el.style.top = "";
+    el.style.transform = "";
+  });
+  const container = document.getElementById("tracks-container");
+  if (container) {
+    container.classList.remove("motion-abs");
+    container.style.height = "";
+  }
+}
+
+function getLevelSpeedFactor(levelId) {
+  if (levelId === "easy") return 0.5;
+  if (levelId === "normal") return 1;
+  if (levelId === "hard") return 1.5;
+  return 1;
+}
+
+function getLevelSpeedCap(levelId) {
+  if (levelId === "easy") return 3;
+  if (levelId === "normal") return 4;
+  if (levelId === "hard") return 7;
+  return 4;
+}
+
+function applyQuizMotion(roundNumber) {
+  // всегда сбрасываем старое движение, чтобы скорость не накапливалась
+  resetOptionMotion();
+  if (currentGameMode !== "quiz") {
+    return;
+  }
+  const options = document.querySelectorAll(".track-option");
+  const container = document.getElementById("tracks-container");
+  if (!container) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const measuredWidth =
+    container.clientWidth ||
+    containerRect.width ||
+    container.scrollWidth ||
+    400;
+  const measuredHeight = Math.max(
+    container.clientHeight,
+    container.offsetHeight,
+    containerRect.height,
+    container.scrollHeight,
+    320
+  );
+  const initialHeight = measuredHeight;
+  container.classList.add("motion-abs");
+  container.style.height = `${initialHeight}px`;
+
+  const movementEnabled = roundNumber >= 2;
+  const levelSpeedFactor = getLevelSpeedFactor(currentLevelId);
+  options.forEach((el) => {
+    const rect = el.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    const maxX = Math.max(0, measuredWidth - w);
+    const maxY = Math.max(0, measuredHeight - h);
+    const startX = Math.random() * maxX;
+    const startY = Math.random() * maxY;
+    el.style.left = `${startX}px`;
+    el.style.top = `${startY}px`;
+    el.classList.remove("option-float");
+
+    const speedCap = getLevelSpeedCap(currentLevelId);
+    const speedBase = movementEnabled
+      ? Math.min(speedCap, Math.max(0.8, roundNumber * levelSpeedFactor))
+      : 0;
+    const vx = movementEnabled ? (Math.random() * 2 - 1) * speedBase * 1.25 : 0;
+    const vy = movementEnabled ? (Math.random() * 2 - 1) * speedBase * 1.25 : 0;
+
+    optionMotionData.set(el, {
+      x: startX,
+      y: startY,
+      vx,
+      vy,
+      w,
+      h,
+    });
+  });
+
+  const tick = () => {
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    optionMotionData.forEach((data, el) => {
+      data.x += data.vx;
+      data.y += data.vy;
+
+      if (data.x <= 0 || data.x + data.w >= width) {
+        data.vx *= -1;
+        data.x = Math.min(Math.max(data.x, 0), width - data.w);
+      }
+      if (data.y <= 0 || data.y + data.h >= height) {
+        data.vy *= -1;
+        data.y = Math.min(Math.max(data.y, 0), height - data.h);
+      }
+      el.style.left = `${data.x}px`;
+      el.style.top = `${data.y}px`;
+    });
+    optionMotionFrame = requestAnimationFrame(tick);
+  };
+  optionMotionFrame = requestAnimationFrame(tick);
 }
 
 function applyRoundSelectionState(state) {
@@ -697,7 +874,7 @@ function restartFromRound(roundNumber) {
   roundStates[roundNumber] = null;
   score = calculateScoreFromStates(roundStates);
   currentRound = roundNumber;
-  setCurrentGameState(score, currentConfig.id);
+  setCurrentGameState(score, getProgressKey());
   uiUpdateHeader({
     playerName: getCurrentPlayerName(),
     score,
@@ -750,8 +927,15 @@ function handleConfirmOption(element) {
   }
 
   // Обычные уровни (клик / двойной клик)
+  let targetEl = element;
+  if (!targetEl && selectedOptionId) {
+    targetEl = document.querySelector(
+      `.track-option[data-id="${selectedOptionId}"]`
+    );
+  }
+  if (!targetEl) return;
   if (!selectedOptionId) {
-    handleSelectOption(element);
+    handleSelectOption(targetEl);
   }
   checkAnswer();
 }
@@ -759,6 +943,9 @@ function handleConfirmOption(element) {
 function checkAnswer() {
   if (roundLocked) return;
   roundLocked = true;
+  if (currentGameMode === "reaction") {
+    resetReactionFlow();
+  }
   const isCorrect = selectedOptionId === currentCorrectId;
 
   uiShowAnswer(currentCorrectId);
@@ -779,7 +966,7 @@ function checkAnswer() {
     totalRounds: currentConfig.rounds,
   });
 
-  setCurrentGameState(score, currentConfig.id);
+  setCurrentGameState(score, getProgressKey());
   updateRoundListUI();
   persistLevelProgress();
 
@@ -801,7 +988,7 @@ function checkAnswer() {
   }, nextDelay);
 }
 
-function showEndModal(reason) {
+function showEndModal(reason, extra = {}) {
   if (!endModal || !modalTitle || !modalText) return;
   const picker = document.getElementById("modal-rounds-picker");
   if (picker) picker.classList.add("hidden");
@@ -812,23 +999,15 @@ function showEndModal(reason) {
   modalTitle.textContent = title;
 
   const levelName = currentConfig.name;
-  modalText.textContent = `Вы набрали ${score} очков на уровне "${levelName}".`;
+  const modeName = MODE_TITLES[currentGameMode] || currentGameMode;
+  if (extra.timeBonus && extra.timeBonus > 0) {
+    modalText.textContent = `Вы набрали ${score} очков в режиме "${modeName}" на сложности "${levelName}". Бонус за прохождение в отведённое время: +${extra.timeBonus}.`;
+  } else {
+    modalText.textContent = `Вы набрали ${score} очков в режиме "${modeName}" на сложности "${levelName}".`;
+  }
 
   // по умолчанию следующего уровня нет
   nextLevelToStart = null;
-
-  // проверяем, можно ли предложить следующий уровень
-  if (
-    currentLevelId === "easy" &&
-    (forceUnlockLevels || score >= UNLOCK_SCORES.normal)
-  ) {
-    nextLevelToStart = "normal";
-  } else if (
-    currentLevelId === "normal" &&
-    (forceUnlockLevels || score >= UNLOCK_SCORES.hard)
-  ) {
-    nextLevelToStart = "hard";
-  }
 
   const isLastLevel = currentLevelId === "hard";
 
@@ -881,7 +1060,7 @@ function renderModalRounds() {
 }
 
 // показ модалки если уровень уже был открыт
-function requestRoundStart(levelId) {
+function requestRoundStart(levelId, mode = currentGameMode) {
   const gameWrapper = document.getElementById("game-main-wrapper");
   const alreadyPlaying =
     levelId === currentLevelId &&
@@ -893,18 +1072,22 @@ function requestRoundStart(levelId) {
     return;
   }
 
-  const saved = savedLevelProgress[levelId];
+  const saved = savedLevelProgress[getProgressKey(levelId, mode)];
   if (saved && saved.roundStates && saved.roundStates.length) {
-    showRoundSelectModal(levelId, saved.roundStates);
+    showRoundSelectModal(levelId, saved.roundStates, mode);
   } else {
     hideRoundSelectModal();
-    startLevel(levelId, true, 1);
+    startLevel(levelId, true, 1, mode);
   }
 }
 
-function showRoundSelectModal(levelId, savedStates = []) {
+function showRoundSelectModal(
+  levelId,
+  savedStates = [],
+  mode = currentGameMode
+) {
   if (!roundSelectModal || !roundSelectList) {
-    startLevel(levelId, true, 1);
+    startLevel(levelId, true, 1, mode);
     return;
   }
   roundSelectList.innerHTML = "";
@@ -919,7 +1102,7 @@ function showRoundSelectModal(levelId, savedStates = []) {
     }
     btn.addEventListener("click", () => {
       hideRoundSelectModal();
-      startLevel(levelId, false, i);
+      startLevel(levelId, false, i, mode);
     });
     roundSelectList.appendChild(btn);
   }
@@ -954,9 +1137,100 @@ function findNextIncompleteRound() {
   return null;
 }
 
+function getUniqueOwner(all, usedIds) {
+  const pool = all.filter((a) => !usedIds.includes(a.id));
+  if (pool.length === 0) return null;
+  return getRandomItem(pool);
+}
+
+function stopGameplayTimers() {
+  clearInterval(timerId);
+  timerId = null;
+  resetReactionFlow();
+  resetOptionMotion();
+  if (feedbackTimeoutId) {
+    clearTimeout(feedbackTimeoutId);
+    feedbackTimeoutId = null;
+  }
+  if (feedbackHideTimeoutId) {
+    clearTimeout(feedbackHideTimeoutId);
+    feedbackHideTimeoutId = null;
+  }
+  const overlay = document.getElementById("feedback-overlay");
+  const icon = document.getElementById("feedback-icon");
+  if (overlay) overlay.classList.add("hidden");
+  if (icon) icon.classList.remove("animating");
+}
+
+function getMazeDimensions(round, levelId) {
+  // базовые сетки по раундам и сложности
+  if (levelId === "easy") {
+    if (round <= 2) return { rows: 3, cols: 3 };
+    if (round <= 4) return { rows: 3, cols: 4 };
+    return { rows: 4, cols: 4 };
+  }
+  if (levelId === "normal") {
+    if (round === 1) return { rows: 3, cols: 3 };
+    if (round === 2) return { rows: 3, cols: 4 };
+    if (round === 3) return { rows: 4, cols: 4 };
+    if (round === 4) return { rows: 4, cols: 5 };
+    return { rows: 5, cols: 5 };
+  }
+  // hard
+  if (round === 1) return { rows: 3, cols: 4 };
+  if (round === 2) return { rows: 4, cols: 4 };
+  if (round === 3) return { rows: 4, cols: 5 };
+  if (round === 4) return { rows: 5, cols: 5 };
+  return { rows: 5, cols: 6 };
+}
+
+function getReactionTTL(round, levelId) {
+  // время жизни одной всплывающей карточки (мс)
+  if (levelId === "easy") return Math.max(1400, 2200 - round * 140);
+  if (levelId === "normal") return Math.max(1100, 1900 - round * 150);
+  return Math.max(900, 1700 - round * 160); // hard
+}
+
+function getReactionSpawnInterval(round, levelId) {
+  // интервал между всплытиями (мс)
+  if (levelId === "easy") return Math.max(1000, 1600 - round * 120);
+  if (levelId === "normal") return Math.max(850, 1500 - round * 130);
+  return Math.max(750, 1400 - round * 140); // hard
+}
+
+function getReactionMaxSpawns(round, levelId) {
+  // сколько всплытий за раунд
+  if (levelId === "easy") return 8 + round;
+  if (levelId === "normal") return 9 + round;
+  return 10 + round;
+}
+
+function getReactionOptionsCount(levelId) {
+  if (levelId === "easy") return 3;
+  if (levelId === "normal") return 4;
+  return 5;
+}
+
+function showInstructionModal() {
+  if (instructionModal) {
+    instructionModal.classList.remove("hidden");
+  }
+}
+
+function hideInstructionModal() {
+  if (instructionModal) {
+    instructionModal.classList.add("hidden");
+  }
+}
+
+function getProgressKey(levelId = currentLevelId, mode = currentGameMode) {
+  return `${mode}:${levelId}`;
+}
+
 function persistLevelProgress() {
   const cloned = cloneRoundStates(roundStates);
-  savedLevelProgress[currentLevelId] = {
+  const key = getProgressKey();
+  savedLevelProgress[key] = {
     roundStates: cloned,
     score,
   };
@@ -976,15 +1250,36 @@ function cloneRoundStates(states) {
 }
 // завершение уровня
 function finishLevel(reason) {
-  clearInterval(timerId);
+  stopGameplayTimers();
+
+  // бонус за прохождение всех раундов в пределах таймера (и не по ручному завершению)
+  const allCorrect =
+    currentConfig &&
+    Array.from({ length: currentConfig.rounds }).every((_, idx) => {
+      const st = roundStates[idx + 1];
+      return st && st.result === true;
+    });
+  const timeBonus =
+    reason === "rounds" && !timeExpired && allCorrect ? TIME_CLEAR_BONUS : 0;
+  if (timeBonus > 0) {
+    score += timeBonus;
+    uiUpdateHeader({
+      playerName: getCurrentPlayerName(),
+      score,
+      round: currentRound,
+      totalRounds: currentConfig ? currentConfig.rounds : 0,
+    });
+  }
 
   const playerName = getCurrentPlayerName();
-  saveGameResultToRating(playerName, score, currentLevelId);
+  const ratingKey = getProgressKey();
+  saveGameResultToRating(playerName, score, ratingKey);
+  updateBestScoreLabel();
 
-  showEndModal(reason);
+  showEndModal(reason, { timeBonus });
 }
 function isMazeMode() {
-  return currentLevelId === "hard" && currentRound >= 3;
+  return currentGameMode === "maze";
 }
 
 let mazeRunning = false; // игрок сейчас проходит лабиринт
@@ -1251,23 +1546,196 @@ function setMazeCursorImage(trackId, cssClass = "") {
   const found = ANIMALS.find((a) => a.id === trackId);
   if (found) {
     img.src = found.track;
+    // не наследуем модификаторы от ответов
     Array.from(img.classList)
       .filter((c) => c.startsWith("mod-"))
       .forEach((c) => img.classList.remove(c));
-    if (cssClass) {
-      cssClass
-        .split(" ")
-        .filter(Boolean)
-        .forEach((c) => img.classList.add(c));
-    }
     img.classList.remove("hidden");
+  }
+}
+
+function launchMazeForCurrentRound() {
+  const { rows, cols } = getMazeDimensions(currentRound, currentLevelId);
+  startMazePhase({
+    rows,
+    cols,
+    onDropToStart: (trackId) => {
+      // игрок бросил след в стартовую клетку
+      selectedOptionId = trackId;
+      const cssClass = getOptionClassForTrack(trackId);
+      setMazeCursorImage(trackId, cssClass);
+    },
+    onSuccess: () => {
+      // лабиринт пройден - проверяем, правильный ли след
+      checkAnswer();
+    },
+    onFail: () => {
+      // задел стену - считаем попытку провальной
+      selectedOptionId = "__wrong__";
+      checkAnswer();
+    },
+  });
+}
+
+function startReactionFlow(state, config) {
+  resetReactionFlow();
+  reactionOptions = state.options;
+  reactionSpawns = 0;
+  reactionLastId = null;
+  const container = document.getElementById("tracks-container");
+  if (!container) return;
+  container.classList.add("motion-abs");
+  const parent = container.parentElement;
+  const measuredHeight =
+    (parent && (parent.clientHeight || parent.offsetHeight)) ||
+    container.clientHeight ||
+    container.scrollHeight ||
+    320;
+  const measuredWidth =
+    (parent && (parent.clientWidth || parent.offsetWidth)) ||
+    container.clientWidth ||
+    container.scrollWidth ||
+    400;
+  container.style.height = `${measuredHeight}px`;
+  container.style.width = `${measuredWidth}px`;
+
+  // прячем все варианты перед первым появлением, чтобы ничего не мелькало внутри контейнера
+  Array.from(container.querySelectorAll(".track-option")).forEach((el) => {
+    el.style.visibility = "hidden";
+    el.style.opacity = "0";
+    el.style.left = "-9999px";
+    el.style.top = "-9999px";
+    el.style.position = "absolute";
+  });
+
+  const spawn = () => {
+    if (roundLocked) return;
+    if (reactionSpawns >= config.maxSpawns) {
+      resetReactionFlow();
+      selectedOptionId = "__wrong__";
+      checkAnswer();
+      return;
+    }
+    reactionSpawns++;
+
+    // выбираем случайную опцию, избегая повтора подряд
+    let opt = reactionOptions[Math.floor(Math.random() * reactionOptions.length)];
+    if (reactionOptions.length > 1) {
+      let attempts = 0;
+      while (opt.id === reactionLastId && attempts < 10) {
+        opt = reactionOptions[Math.floor(Math.random() * reactionOptions.length)];
+        attempts++;
+      }
+    }
+    reactionLastId = opt.id;
+    const el = container.querySelector(`.track-option[data-id="${opt.id}"]`);
+    if (!el) return;
+
+    // позиционируем: старт снаружи, прилёт ближе к центру
+    const contRect = container.getBoundingClientRect();
+    const cw = contRect.width || measuredWidth || 400;
+    const ch = contRect.height || measuredHeight || 320;
+    const w = el.offsetWidth > 1 ? el.offsetWidth : 140;
+    const h = el.offsetHeight > 1 ? el.offsetHeight : 140;
+    const targetX = cw * (0.3 + Math.random() * 0.4) - w / 2;
+    const targetY = ch * (0.3 + Math.random() * 0.4) - h / 2;
+
+    const side = Math.floor(Math.random() * 4); // 0 top,1 right,2 bottom,3 left
+    let startX = targetX;
+    let startY = targetY;
+    const offset = Math.max(w, h, 120);
+    // все карточки стартуют за пределами контейнера и влетают внутрь
+    if (side === 0) {
+      startX = Math.random() * cw;
+      startY = -h - offset;
+    } else if (side === 1) {
+      startX = cw + offset;
+      startY = Math.random() * ch;
+    } else if (side === 2) {
+      startX = Math.random() * cw;
+      startY = ch + offset;
+    } else {
+      startX = -w - offset;
+      startY = Math.random() * ch;
+    }
+
+    const isFirstSpawn = reactionSpawns === 1;
+
+    const rotStart = -45 + Math.random() * 90;
+    const rotEnd = -25 + Math.random() * 50;
+
+    // сбросим предыдущие переходы, чтобы не было "рывков"
+    el.classList.remove("reaction-active", "reaction-animated");
+    el.style.visibility = "hidden";
+    el.style.transition = "none";
+    el.style.left = `${startX}px`;
+    el.style.top = `${startY}px`;
+    el.style.opacity = "0";
+    el.style.transform = `rotate(${rotStart}deg)`;
+    // принудительный рефлоу
+    void el.offsetWidth;
+
+    // первая карточка может быть скрыта, чтобы не мигала внутри
+    if (isFirstSpawn) {
+      el.style.visibility = "hidden";
+      el.style.opacity = "0";
+      el.style.left = `${startX}px`;
+      el.style.top = `${startY}px`;
+      el.style.transform = `rotate(${rotStart}deg)`;
+      // запускаем следующую без задержки
+      reactionTimerId = setTimeout(() => spawn(), 50);
+      return;
+    }
+
+    el.style.transition = "";
+    el.classList.add("reaction-animated");
+    // принудительный рефлоу перед анимацией
+    void el.offsetWidth;
+    el.classList.add("reaction-active");
+    el.style.visibility = "visible";
+    el.style.left = `${targetX}px`;
+    el.style.top = `${targetY}px`;
+    el.style.opacity = "1";
+    el.style.transform = `rotate(${rotEnd}deg)`;
+
+    // таймер скрытия
+    const hideTimer = setTimeout(() => {
+      el.classList.remove("reaction-active");
+      el.style.opacity = "0";
+    }, config.ttl);
+
+    // следующее всплытие
+    reactionTimerId = setTimeout(() => {
+      spawn();
+    }, config.spawnInterval);
+  };
+
+  spawn();
+}
+
+function resetReactionFlow() {
+  if (reactionTimerId) {
+    clearTimeout(reactionTimerId);
+    reactionTimerId = null;
+  }
+  reactionOptions = [];
+  const container = document.getElementById("tracks-container");
+  if (container) {
+    Array.from(container.querySelectorAll(".track-option")).forEach((el) => {
+      el.classList.remove("reaction-active");
+      el.classList.remove("reaction-animated");
+      el.style.opacity = "0";
+      el.style.visibility = "hidden";
+    });
   }
 }
 
 function setQuestionText(questionType) {
   const el = document.getElementById("question-text");
   if (!el) return;
-  if (questionType === "animal") {
+  if (currentGameMode === "reaction") {
+    el.textContent = "Реакция: кликай по правильному следу.";
+  } else if (questionType === "animal") {
     el.textContent = "Кому принадлежит этот след?";
   } else {
     el.textContent = "Выбери след, который принадлежит этому существу:";

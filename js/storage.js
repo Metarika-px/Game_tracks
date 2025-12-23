@@ -59,14 +59,19 @@ function saveRoundProgressToStorage() {
     localStorage.setItem("roundProgress", JSON.stringify(savedLevelProgress));
   } catch (e) {}
 }
-function getBestScoreForLevel(levelId) {
+function getBestScoreForLevel(levelId, mode) {
+  const levelKey = mode ? `${mode}:${levelId}` : levelId;
   const data = JSON.parse(localStorage.getItem("game_results") || "[]");
   const playerName = getCurrentPlayerName();
   if (!playerName) return 0;
 
   let best = 0;
   for (const rec of data) {
-    if (rec.name === playerName && rec.level === levelId && rec.score > best) {
+    if (
+      rec.name === playerName &&
+      rec.level === levelKey &&
+      rec.score > best
+    ) {
       best = rec.score;
     }
   }

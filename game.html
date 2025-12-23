@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/modifiers.css" />
   </head>
   <body class="game-body">
+    <div id="global-floating-bg" class="floating-bg floating-bg-global"></div>
     <header class="game-header">
       <div class="player-info">
         <button id="change-player-btn" class="btn-secondary btn-compact">
@@ -26,26 +27,50 @@
     </header>
 
     <section id="level-select" class="level-select">
-      <h2>Выбери уровень</h2>
-      <p id="level-hint" class="level-hint">
-        Уровень "Нормально" и "Сложно" откроются после набора нужного количества
-        очков.
-      </p>
+      <div class="level-select-content">
+        <h2>Выбери режим</h2>
+        <p id="level-hint" class="level-hint">
+          Чтоб открыть заметки следопыта, нажми на клавишу "I".
+        </p>
+        <p id="best-score-label" class="level-hint">
+          Лучший результат на выбранных настройках: 0
+        </p>
 
-      <div class="level-buttons">
-        <button id="level-easy-btn" class="btn-primary menu-btn">Легко</button>
-        <button id="level-normal-btn" class="btn-secondary menu-btn">
-          Нормально
-        </button>
-        <button id="level-hard-btn" class="btn-secondary menu-btn">
-          Сложно
-        </button>
-      </div>
+        <div class="difficulty-toggle" id="difficulty-toggle">
+          <button class="diff-btn active" data-diff="easy">Легко</button>
+          <button class="diff-btn" data-diff="normal">Нормально</button>
+          <button class="diff-btn" data-diff="hard">Сложно</button>
+        </div>
 
-      <div class="menu-bottom">
-        <button id="leaderboard-btn" class="btn-secondary menu-btn-wide">
-          Таблица лидеров
-        </button>
+        <div class="mode-buttons">
+          <button
+            id="mode-quiz-btn"
+            class="btn-secondary menu-btn"
+            data-mode-btn="quiz"
+          >
+            Викторина
+          </button>
+          <button
+            id="mode-maze-btn"
+            class="btn-secondary menu-btn"
+            data-mode-btn="maze"
+          >
+            Марафон лабиринтов
+          </button>
+          <button
+            id="mode-reaction-btn"
+            class="btn-secondary menu-btn"
+            data-mode-btn="reaction"
+          >
+            Реакция
+          </button>
+        </div>
+
+        <div class="menu-bottom">
+          <button id="leaderboard-btn" class="btn-leaderboard menu-btn-wide">
+            Таблица лидеров
+          </button>
+        </div>
       </div>
     </section>
 
@@ -61,6 +86,11 @@
             <img id="owner-image" src="" alt="Хозяин следа" />
             <p id="owner-name"></p>
           </div>
+          <div class="confirm-wrapper question-confirm">
+            <button id="confirm-answer-btn" class="btn-primary menu-btn">
+              Подтвердить ответ
+            </button>
+          </div>
         </section>
 
         <section class="options-panel">
@@ -73,10 +103,10 @@
               ↺
             </button>
           </div>
-          <h3 id="options-title">Выбери след (двойной клик — подтвердить):</h3>
+          <h3 id="options-title">Выберите и подтвердите ответ:</h3>
           <p id="view-mode-hint" class="view-mode-hint hidden">
             Режим просмотра: нажмите на кнопку "перезапустить раунд" ↺ в правом
-            в верхнем углу, чтобы переиграть этот раунд.
+            верхнем углу, чтобы переиграть этот раунд.
           </p>
           <div id="tracks-container" class="tracks-container"></div>
 
@@ -114,16 +144,16 @@
         <p id="modal-text"></p>
 
         <div class="modal-buttons">
-          <button id="modal-replay-btn" class="btn-primary">
+          <button id="modal-replay-btn" class="btn-primary menu-btn-wide">
             Сыграть ещё раз
           </button>
-          <button id="modal-level-select-btn" class="btn-secondary">
-            Выбор сложности
+          <button id="modal-level-select-btn" class="btn-secondary menu-btn-wide">
+            Выбор уровня
           </button>
-          <button id="modal-next-btn" class="btn-secondary">
-            Следующий уровень
-          </button>
-          <button id="modal-leaderboard-btn" class="btn-secondary">
+          <button
+            id="modal-leaderboard-btn"
+            class="btn-leaderboard menu-btn-wide"
+          >
             Таблица лидеров
           </button>
         </div>
@@ -132,7 +162,7 @@
           <h3>Выбери раунд для повторного запуска</h3>
           <div id="modal-rounds-list" class="modal-rounds-list"></div>
           <p class="modal-rounds-hint">
-            Красный — неправильный ответ. Выбери раунд, чтобы начать с него.
+            Красный - неправильный ответ. Выбери раунд, чтобы начать с него.
           </p>
         </div>
       </div>
@@ -145,13 +175,53 @@
           <h3>Выбери раунд для повторного запуска</h3>
           <div id="round-select-list" class="modal-rounds-list"></div>
           <p class="modal-rounds-hint">
-            Красный — неправильный ответ. Выбери раунд, чтобы начать с него.
+            Красный - неправильный ответ. Выбери раунд, чтобы начать с него.
           </p>
           <div class="modal-buttons">
             <button id="round-select-cancel" class="btn-secondary">
               Отмена
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="instruction-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h2>Заметки следопыта</h2>
+        <p>
+          Приветствую тебя, дорогой друг, в увлекательном мире следов! Давай
+          разберёмся, как и зачем здесь всё работает. Режим выбирай двойным
+          кликом по мини-игре, а сложность — переключателем. Если заблудишься,
+          нажми клавишу «I»; окно подскажет, как стать опытным следопытом.
+        </p>
+        <p>
+          <strong>Викторина.</strong> Выбери один правильный след из доступных.
+          Но будь внимательнее! Чем дальше ты заходишь, тем запутаннее
+          становится след!
+        </p>
+        <p>
+          <strong>Лабиринт.</strong> Выбери правильный след, перетащи его в
+          зелёную зону и проведи по лабиринту до красной, не касаясь стен. С
+          каждым уровнем лабиринт будет становиться сложнее, и лишь опытный
+          следопыт сможет пройти его безупречно.
+        </p>
+        <p>
+          <strong>Реакция.</strong> В уровне «Реакция» ты проверишь свою реакцию
+          и внимательность. Будь начеку: только опытный следопыт умеет быстро
+          ориентироваться и принимать верные решения. Кликай по правильному
+          следу среди появляющихся.
+        </p>
+        <p>
+          <strong>Сложность.</strong> Уровень сложности влияет на скорость игры,
+          штрафные очки, время, количество вариантов и итоговую награду.
+        </p>
+        <p>Успехов в новых начинаниях, следопыт!</p>
+        <div class="modal-buttons">
+          <button id="instruction-close-btn" class="btn-primary">
+            Понятно
+          </button>
         </div>
       </div>
     </div>

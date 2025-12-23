@@ -7,6 +7,13 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.game-body > * {
+  position: relative;
+  z-index: 1;
 }
 
 .game-header {
@@ -50,11 +57,14 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
 
 .question-panel,
 .options-panel,
 .rounds-panel {
+  display: flex;
+  flex-direction: column;
   background: #181818;
   border-radius: 14px;
   padding: 24px 28px;
@@ -89,11 +99,15 @@
   flex-wrap: wrap;
   gap: 0;
   position: relative;
+  height: 100%;
 }
 
 .track-option {
+  --opt-rot: 0deg;
+  --opt-scale: 1;
   border-radius: 0;
   padding: 0;
+  overflow: hidden;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease, border 0.15s;
   border: 2px solid transparent;
@@ -104,12 +118,13 @@
   margin: 0;
   object-fit: contain;
   transform-origin: center;
+  transform: rotate(var(--opt-rot)) scale(var(--opt-scale));
   z-index: 2;
   pointer-events: auto;
 }
 
 .track-option:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) rotate(var(--opt-rot)) scale(var(--opt-scale));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
 }
 
@@ -214,6 +229,50 @@
   margin: 0;
   pointer-events: auto;
 }
+.track-option.reaction-active {
+  opacity: 1 !important;
+}
+.track-option.reaction-animated {
+  transition: left 0.7s ease, top 0.7s ease, transform 0.7s ease,
+    opacity 0.7s ease;
+}
+.confirm-wrapper {
+  margin-top: 12px;
+  text-align: center;
+}
+.question-confirm {
+  margin-bottom: 12px;
+  margin-top: auto;
+}
+.tracks-container.motion-abs {
+  position: relative;
+}
+.tracks-container.motion-abs .track-option {
+  position: absolute;
+}
+
+.track-option.option-float {
+  animation-name: option-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@keyframes option-drift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--opt-rot)) scale(var(--opt-scale));
+  }
+  50% {
+    transform: translate3d(var(--dx, 6px), var(--dy, 6px), 0)
+      rotate(var(--opt-rot))
+      scale(var(--opt-scale));
+  }
+  100% {
+    transform: translate3d(calc(var(--dx, 6px) * 1.25), calc(var(--dy, 6px) * 1.25), 0)
+      rotate(var(--opt-rot))
+      scale(var(--opt-scale));
+  }
+}
 
 .view-mode-hint {
   margin: 4px 0 0;
@@ -258,6 +317,8 @@
   padding: 26px 30px 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
   text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .level-select h2 {
@@ -270,13 +331,6 @@
   margin: 4px 0 20px;
   font-size: 14px;
   color: #bbbbbb;
-}
-
-.level-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 18px;
 }
 
 .menu-btn {
@@ -295,6 +349,102 @@
   padding: 12px 22px;
   font-size: 16px;
   border-radius: 999px;
+}
+.btn-leaderboard {
+  background: #2196f3;
+  color: #e7f3ff;
+  box-shadow: 0 4px 10px rgba(33, 150, 243, 0.35);
+  border: 1px solid rgba(33, 150, 243, 0.7);
+}
+.btn-leaderboard:hover {
+  background: #42a5f5;
+}
+
+.difficulty-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0 24px;
+}
+
+.diff-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #2c2c2c;
+  background: #111;
+  color: #eee;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s;
+}
+
+.diff-btn:hover {
+  border-color: #2196f3;
+  transform: translateY(-1px);
+}
+
+.diff-btn.active {
+  border-color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.mode-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.mode-buttons .mode-btn-active {
+  border-color: #2196f3;
+  background: rgba(33, 150, 243, 0.22);
+  color: #e7f3ff;
+  box-shadow: none;
+}
+.floating-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(2px);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floating-bg-global {
+  position: fixed;
+  inset: 0;
+  opacity: 0.25;
+  filter: blur(3px);
+}
+
+.level-select-content {
+  position: relative;
+  z-index: 1;
+}
+
+.floating-item {
+  position: absolute;
+  opacity: 0.45;
+  animation: float-free linear infinite;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+
+@keyframes float-free {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(calc(var(--dx, 0px) * 0.55), calc(var(--dy, 0px) * 0.55), 0)
+      rotate(7deg);
+  }
+  100% {
+    transform: translate3d(var(--dx, 0px), var(--dy, 0px), 0) rotate(14deg);
+  }
 }
 
 .menu-bottom {
@@ -368,8 +518,8 @@
   position: relative;
   background: #202020;
   border-radius: 18px;
-  padding: 22px 26px;
-  max-width: 420px;
+  padding: 28px 32px;
+  max-width: 520px;
   width: 100%;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
   text-align: center;
@@ -378,14 +528,15 @@
 
 .modal-content h2 {
   margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 22px;
+  margin-bottom: 12px;
+  font-size: 24px;
 }
 
 .modal-content p {
   margin-top: 0;
   margin-bottom: 18px;
-  font-size: 14px;
+  font-size: 15px;
+  line-height: 1.55;
   color: #dddddd;
 }
 
@@ -398,8 +549,14 @@
 }
 
 .modal-buttons .btn-primary,
-.modal-buttons .btn-secondary {
+.modal-buttons .btn-secondary,
+.modal-buttons .btn-leaderboard {
   min-width: 150px;
+}
+.modal-buttons .btn-leaderboard {
+  font-size: 16px;
+  padding: 12px 22px;
+  border-radius: 999px;
 }
 
 .modal-rounds {

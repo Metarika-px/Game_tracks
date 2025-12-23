@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/start.css" />
   </head>
   <body class="start-body">
+    <div id="global-floating-bg" class="floating-bg floating-bg-global"></div>
     <div class="start-container">
       <h1 class="game-title">Игра «Следы»</h1>
       <p class="game-subtitle">
@@ -27,6 +28,13 @@
         <button type="submit" class="btn-primary">Начать игру</button>
       </form>
     </div>
+    <script src="js/tracks.js"></script>
+    <script src="js/floating.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        initGlobalFloatingBackground();
+      });
+    </script>
     <script src="js/main.js"></script>
   </body>
 </html>

@@ -85,3 +85,44 @@ img {
 *::-webkit-scrollbar-thumb:hover {
   background: #4caf50;
 }
+
+/* Глобальный фон с плавающими элементами */
+.floating-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  filter: blur(2px);
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floating-bg-global {
+  position: fixed;
+  inset: 0;
+  opacity: 0.25;
+  filter: blur(3px);
+}
+
+.floating-item {
+  position: absolute;
+  opacity: 0.45;
+  animation: float-free linear infinite;
+  animation-direction: alternate;
+  animation-fill-mode: both;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+
+@keyframes float-free {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(calc(var(--dx, 0px) * 0.55), calc(var(--dy, 0px) * 0.55), 0)
+      rotate(7deg);
+  }
+  100% {
+    transform: translate3d(var(--dx, 0px), var(--dy, 0px), 0) rotate(14deg);
+  }
+}

@@ -60,7 +60,7 @@ function uiClearSelection() {
   }
 
   if (optionsTitle) {
-    optionsTitle.textContent = "Выбери след (двойной клик — подтвердить):";
+    optionsTitle.textContent = "Выберите и подтвердите ответ:";
   }
 }
 
@@ -97,17 +97,28 @@ function uiRenderTrackOptions(
     if (mode === "maze") {
       optionsTitle.textContent =
         "Выбери след и перетащи его в старт лабиринта:";
+    } else if (mode === "reaction") {
+      optionsTitle.textContent = "Успей кликнуть верный ответ";
     } else if (questionType === "animal") {
       optionsTitle.textContent =
-        "Выбери хозяина следа (двойной клик - подтвердить):";
+        "Выберите и подтвердите ответ:";
     } else {
-      optionsTitle.textContent = "Выбери след (двойной клик - подтвердить):";
+      optionsTitle.textContent = "Выберите и подтвердите ответ:";
     }
   }
 
   const rendered = [];
   options.forEach((opt) => {
     const el = uiCreateTrackOption(opt);
+
+    // для реакции прячем и уводим элементы сразу, чтобы первое появление было из-за контейнера
+    if (mode === "reaction") {
+      el.style.visibility = "hidden";
+      el.style.opacity = "0";
+      el.style.position = "absolute";
+      el.style.left = "-9999px";
+      el.style.top = "-9999px";
+    }
 
     if (mode === "click") {
       el.addEventListener("click", () => onSelect(el));
@@ -117,6 +128,12 @@ function uiRenderTrackOptions(
         onConfirm(el);
       });
       // избегаем нативного drag изображения
+      el.addEventListener("dragstart", (e) => e.preventDefault());
+    } else if (mode === "reaction") {
+      el.addEventListener("click", () => {
+        onSelect(el);
+        onConfirm(el);
+      });
       el.addEventListener("dragstart", (e) => e.preventDefault());
     } else if (mode === "maze") {
       el.setAttribute("draggable", "true");
@@ -153,14 +170,14 @@ function placeRandomNoOverlap(container, elements) {
   const cardW = 154;
   const cardH = 144;
 
-  const contWidth = container.clientWidth || 620;
+  const contRect = container.getBoundingClientRect();
+  const contWidth = Math.max(container.clientWidth, contRect.width, 620);
+  const contHeight = Math.max(container.clientHeight, contRect.height, 400);
+
   const colsFallback = Math.max(1, Math.floor(contWidth / (cardW + padding)));
   const rowsFallback = Math.ceil(elements.length / colsFallback);
-  const contHeight = Math.max(
-    container.clientHeight,
-    rowsFallback * (cardH + padding) + padding,
-    400
-  );
+  const computedHeight = rowsFallback * (cardH + padding) + padding;
+  const finalHeight = Math.max(contHeight, computedHeight);
 
   const placed = [];
 
@@ -204,8 +221,8 @@ function placeRandomNoOverlap(container, elements) {
   const iterations = 24;
   const minX = 0;
   const minY = 0;
-  const maxX = Math.max(0, contWidth - cardW);
-  const maxY = Math.max(0, contHeight - cardH);
+    const maxX = Math.max(0, contWidth - cardW);
+    const maxY = Math.max(0, finalHeight - cardH);
 
   for (let iter = 0; iter < iterations; iter++) {
     for (let i = 0; i < placed.length; i++) {
@@ -234,7 +251,7 @@ function placeRandomNoOverlap(container, elements) {
     el.style.top = `${p.y}px`;
   });
 
-  container.style.height = `${contHeight}px`;
+  container.style.height = `${finalHeight}px`;
 }
 
 function clamp(val, min, max) {

@@ -1,21 +1,22 @@
 .track-option.mod-rot-15 {
-  transform: rotate(55deg);
+  --opt-rot: 55deg;
 }
 
 .track-option.mod-rot--15 {
-  transform: rotate(-55deg);
+  --opt-rot: -55deg;
 }
 
 .track-option.mod-rot-30 {
-  transform: rotate(85deg);
+  --opt-rot: 85deg;
 }
 
 .track-option.mod-small {
-  transform: scale(0.7) rotate(-8deg);
+  --opt-scale: 0.7;
+  --opt-rot: -8deg;
 }
 
 .track-option.mod-tilt {
-  transform: rotate(-25deg);
+  --opt-rot: -25deg;
 }
 
 .maze-cursor-img.mod-rot-15 {

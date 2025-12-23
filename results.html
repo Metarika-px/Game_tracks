@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/results.css" />
   </head>
   <body class="results-body">
+    <div id="global-floating-bg" class="floating-bg floating-bg-global"></div>
     <div class="results-container">
       <h1>Рейтинг игроков</h1>
 
@@ -41,7 +42,14 @@
       </div>
     </div>
 
+    <script src="js/tracks.js"></script>
+    <script src="js/floating.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/results.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        initGlobalFloatingBackground();
+      });
+    </script>
   </body>
 </html>
