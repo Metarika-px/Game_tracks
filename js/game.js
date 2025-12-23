@@ -35,7 +35,7 @@ const TIME_CLEAR_BONUS = 15;
 
 let currentLevelId = "easy";
 let currentConfig = LEVELS.easy;
-let currentGameMode = "quiz"; // quiz | maze | reaction
+let currentGameMode = "quiz"; // режим: викторина / лабиринт / реакция
 
 let currentRound = 1;
 let score = 0;
@@ -88,7 +88,7 @@ function calculateScoreFromStates(states) {
   return total;
 }
 
-// Подбираем модификаторы сложности для картинок
+// Выбираем модификаторы для картинок
 function getRandomModifierForRound(round) {
   const midMods = ["mod-rot-15", "mod-rot--15", "mod-rot-30", "mod-tilt"];
   const maskMods = ["mod-mask"];
@@ -101,17 +101,17 @@ function getRandomModifierForRound(round) {
 
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // количество модификаторов: раунд - 1 (первый без), максимум 3
+  // сколько модов: раунд - 1 (первый без), максимум 3
   let count = Math.max(0, round - 1);
   if (count > 3) count = 3;
   if (count === 0) return "";
 
-  // базовый пул по сложности
+  // базовый набор по сложности
   let pool = [...midMods, ...maskMods];
   if (currentLevelId !== "easy") {
     pool.push(...blurMods, ...cutMods);
   }
-  // с 3-го раунда добавляем анимации с повышенным весом
+  // с 3-го раунда добавляем больше анимаций
   if (round >= 3) {
     pool.push(...animMods, ...animMods);
     pool.push(...shapeMods);
@@ -127,7 +127,7 @@ function getRandomModifierForRound(round) {
     }
   }
 
-  // гарантируем хотя бы одну анимацию с 3-го раунда
+  // хоть одна анимация с 3-го раунда
   if (round >= 3 && !result.some((m) => animMods.includes(m))) {
     result[0] = pick(animMods);
   }
@@ -180,7 +180,7 @@ function handleTimeExpired() {
   setCurrentGameState(score, getProgressKey());
 }
 
-// инициализация страницы
+// старт страницы
 document.addEventListener("DOMContentLoaded", () => {
   let playerName = getCurrentPlayerName();
   const storedRaw = localStorage.getItem("currentPlayerName");
@@ -255,7 +255,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupLevelMenu();
   initFloatingBackground();
 
-  // показать заметки следопыта при первом заходе на страницу
+  // показать заметки следопыта при первом заходе
   const seenKey = `seenInstructionModal:${playerName || "guest"}`;
   const hasSeenInstruction = sessionStorage.getItem(seenKey);
   if (!hasSeenInstruction) {
@@ -286,7 +286,7 @@ function toggleHeaderStats(show) {
   });
 }
 
-// меню выбора уровня
+// меню выбора режима/уровня
 function setupLevelMenu() {
   const hint = document.getElementById("level-hint");
   if (hint) {
@@ -432,7 +432,7 @@ function getOptionsCountForLevel(levelId) {
   if (levelId === "normal") return 4;
   return 5;
 }
-// старт конкретного уровня
+// запуск уровня
 function startLevel(
   levelId,
   reset = false,
@@ -479,14 +479,14 @@ function startLevel(
     }
   }
 
-  // показываем основную игру, прячем меню
+  // показываем игру, прячем меню
   const selectBlock = document.getElementById("level-select");
   const gameWrapper = document.getElementById("game-main-wrapper");
   if (selectBlock) selectBlock.classList.add("hidden");
   if (gameWrapper) gameWrapper.classList.remove("hidden");
   toggleHeaderStats(true);
 
-  // обновляем заголовки
+  // обновляем верхний блок
   const levelLabel = document.getElementById("level-label");
   if (levelLabel)
     levelLabel.textContent = `${
@@ -624,7 +624,7 @@ function startRound() {
   }
 
   const mode = isMazeMode() ? "maze" : "click";
-  // реакция - отдельный режим
+  // реакция — отдельный режим
   const isReaction = currentGameMode === "reaction";
   if (isReaction) {
     const desired = getReactionOptionsCount(currentLevelId);
@@ -799,7 +799,7 @@ function getLevelSpeedCap(levelId) {
 }
 
 function applyQuizMotion(roundNumber) {
-  // всегда сбрасываем старое движение, чтобы скорость не накапливалась
+  // сбрасываем старое движение, чтобы скорость не накапливалась
   resetOptionMotion();
   if (currentGameMode !== "quiz") {
     return;

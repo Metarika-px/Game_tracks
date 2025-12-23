@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentBlock.textContent = "Сыграйте первую игру, чтобы увидеть результат.";
   } else {
     // агрегируем по игроку: сумма лучших результатов по каждому уровню (без учёта режима)
-    const bestPerPlayerLevel = new Map(); // key: name|level => {score, date}
+    const bestPerPlayerLevel = new Map(); // name|level => {score, date}
     allGames.forEach((rec) => {
       const levelBase = (rec.level || "").toString().split(":").pop();
       const key = `${rec.name}|${levelBase}`;

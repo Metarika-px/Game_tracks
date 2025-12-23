@@ -54,7 +54,7 @@ function uiClearSelection() {
   const optionsTitle = document.getElementById("options-title");
   const mazeArea = document.getElementById("maze-area");
 
-  // всегда прячем лабиринт при начале нового раунда/уровня
+  // скрываем лабиринт при старте раунда
   if (mazeArea) {
     mazeArea.classList.add("hidden");
   }
@@ -111,7 +111,7 @@ function uiRenderTrackOptions(
   options.forEach((opt) => {
     const el = uiCreateTrackOption(opt);
 
-    // для реакции прячем и уводим элементы сразу, чтобы первое появление было из-за контейнера
+    // реакция: прячем и уводим опции до спавна
     if (mode === "reaction") {
       el.style.visibility = "hidden";
       el.style.opacity = "0";
@@ -127,7 +127,7 @@ function uiRenderTrackOptions(
         e.stopPropagation();
         onConfirm(el);
       });
-      // избегаем нативного drag изображения
+      // убираем нативный drag у картинки
       el.addEventListener("dragstart", (e) => e.preventDefault());
     } else if (mode === "reaction") {
       el.addEventListener("click", () => {
@@ -217,7 +217,7 @@ function placeRandomNoOverlap(container, elements) {
     placed.push({ x, y });
   });
 
-  // лёгкая итеративная "растяжка" — раздвигаем близкие карточки
+  // лёгкая "растяжка" — раздвигаем близкие карточки
   const iterations = 24;
   const minX = 0;
   const minY = 0;
