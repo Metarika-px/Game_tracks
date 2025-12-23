@@ -76,6 +76,8 @@ let reactionTimerId = null;
 let reactionSpawns = 0;
 let reactionOptions = [];
 let reactionLastId = null;
+let feedbackActive = false;
+let headerStatsEls = [];
 
 function calculateScoreFromStates(states) {
   if (!currentConfig) return 0;
@@ -217,6 +219,9 @@ document.addEventListener("DOMContentLoaded", () => {
   instructionModal = document.getElementById("instruction-modal");
   instructionCloseBtn = document.getElementById("instruction-close-btn");
   confirmBtn = document.getElementById("confirm-answer-btn");
+  headerStatsEls = Array.from(
+    document.querySelectorAll(".score-info, .round-info, .timer-info")
+  );
   if (modalReplayBtn) {
     modalReplayBtn.addEventListener("click", () => {
       hideEndModal();
@@ -266,14 +271,35 @@ document.addEventListener("DOMContentLoaded", () => {
   loadRoundProgressFromStorage();
   setupLevelMenu();
   initFloatingBackground();
+
+  // показать заметки следопыта при первом заходе на страницу
+  const hasSeenInstruction = localStorage.getItem("seenInstructionModal");
+  if (!hasSeenInstruction) {
+    showInstructionModal();
+    localStorage.setItem("seenInstructionModal", "1");
+  }
+
+  toggleHeaderStats(false);
 });
 
 function handleHelpToggle(event) {
   if (!event.key) return;
   const key = event.key.toLowerCase();
   if (key === "i" || key === "ш") {
-    showInstructionModal();
+    if (instructionModal && !instructionModal.classList.contains("hidden")) {
+      hideInstructionModal();
+    } else {
+      showInstructionModal();
+    }
   }
+}
+
+function toggleHeaderStats(show) {
+  if (!headerStatsEls) return;
+  headerStatsEls.forEach((el) => {
+    if (show) el.classList.remove("hidden");
+    else el.classList.add("hidden");
+  });
 }
 
 // меню выбора уровня
@@ -340,6 +366,7 @@ function showLevelSelectMenu() {
   const gameWrapper = document.getElementById("game-main-wrapper");
   if (selectBlock) selectBlock.classList.remove("hidden");
   if (gameWrapper) gameWrapper.classList.add("hidden");
+  toggleHeaderStats(false);
   setupLevelMenu();
 }
 
@@ -376,30 +403,31 @@ function initFloatingBackground() {
     const opacity = 0.25 + Math.random() * 0.35;
     img.style.opacity = opacity.toFixed(2);
 
-    const w = window.innerWidth || 1200;
-    const h = window.innerHeight || 800;
+    const w = container.clientWidth || window.innerWidth || 1200;
+    const h = container.clientHeight || window.innerHeight || 800;
 
     const edge = Math.floor(Math.random() * 4); // 0 top,1 right,2 bottom,3 left
+    const offset = Math.max(size, 180);
     let startX, startY, endX, endY;
     if (edge === 0) {
       startX = Math.random() * 100;
-      startY = -30;
+      startY = -(offset / h) * 100;
       endX = Math.random() * 100;
-      endY = 130;
+      endY = 100 + (offset / h) * 100;
     } else if (edge === 1) {
-      startX = 130;
+      startX = 100 + (offset / w) * 100;
       startY = Math.random() * 100;
-      endX = -30;
+      endX = -(offset / w) * 100;
       endY = Math.random() * 100;
     } else if (edge === 2) {
       startX = Math.random() * 100;
-      startY = 130;
+      startY = 100 + (offset / h) * 100;
       endX = Math.random() * 100;
-      endY = -30;
+      endY = -(offset / h) * 100;
     } else {
-      startX = -30;
+      startX = -(offset / w) * 100;
       startY = Math.random() * 100;
-      endX = 130;
+      endX = 100 + (offset / w) * 100;
       endY = Math.random() * 100;
     }
 
@@ -464,6 +492,7 @@ function startLevel(
   const gameWrapper = document.getElementById("game-main-wrapper");
   if (selectBlock) selectBlock.classList.add("hidden");
   if (gameWrapper) gameWrapper.classList.remove("hidden");
+  toggleHeaderStats(true);
 
   // обновляем заголовки
   const levelLabel = document.getElementById("level-label");
@@ -1763,6 +1792,7 @@ function updateRoundListUI() {
     }
     btn.disabled = false;
     btn.addEventListener("click", () => {
+      if (feedbackActive) return;
       hideEndModal();
       if (i === currentRound && (!state || state.result === null)) {
         return;
@@ -1785,6 +1815,7 @@ function showFeedbackOverlay(isCorrect) {
   const icon = document.getElementById("feedback-icon");
   if (!overlay || !icon) return;
 
+  feedbackActive = true;
   if (feedbackTimeoutId) clearTimeout(feedbackTimeoutId);
   if (feedbackHideTimeoutId) clearTimeout(feedbackHideTimeoutId);
 
@@ -1802,6 +1833,7 @@ function showFeedbackOverlay(isCorrect) {
     icon.classList.remove("animating");
     feedbackHideTimeoutId = setTimeout(() => {
       overlay.classList.add("hidden");
+      feedbackActive = false;
     }, 200);
   }, 2000);
 }

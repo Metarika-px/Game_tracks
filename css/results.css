@@ -11,7 +11,7 @@
 
 .results-container {
   margin-top: 40px;
-  background: #181818;
+  background: rgba(20, 20, 20, 0.9);
   padding: 24px 28px;
   border-radius: 16px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7);
@@ -36,7 +36,7 @@
   margin-bottom: 16px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #222;
+  background: rgba(34, 34, 34, 0.85);
   font-size: 14px;
 }
 

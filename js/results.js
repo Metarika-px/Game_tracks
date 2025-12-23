@@ -14,9 +14,37 @@ document.addEventListener("DOMContentLoaded", () => {
     tbody.innerHTML = '<tr><td colspan="5">Пока нет результатов.</td></tr>';
     currentBlock.textContent = "Сыграйте первую игру, чтобы увидеть результат.";
   } else {
-    // последняя сыгранная игра последний элемент массива
-    const lastGame = allGames[allGames.length - 1];
+    // агрегируем по игроку: сумма лучших результатов по каждому уровню (без учёта режима)
+    const bestPerPlayerLevel = new Map(); // key: name|level => {score, date}
+    allGames.forEach((rec) => {
+      const levelBase = (rec.level || "").toString().split(":").pop();
+      const key = `${rec.name}|${levelBase}`;
+      const prev = bestPerPlayerLevel.get(key);
+      if (!prev || rec.score > prev.score) {
+        bestPerPlayerLevel.set(key, { score: rec.score, date: rec.date });
+      }
+    });
 
+    const totalsByPlayer = new Map(); // name => {score, lastDate}
+    bestPerPlayerLevel.forEach((val, key) => {
+      const [name] = key.split("|");
+      const prev = totalsByPlayer.get(name) || { score: 0, lastDate: null };
+      const lastDate =
+        !prev.lastDate || new Date(val.date) > new Date(prev.lastDate)
+          ? val.date
+          : prev.lastDate;
+      totalsByPlayer.set(name, {
+        score: prev.score + val.score,
+        lastDate,
+      });
+    });
+
+    const ratingSorted = Array.from(totalsByPlayer.entries())
+      .map(([name, info]) => ({ name, score: info.score, date: info.lastDate }))
+      .sort((a, b) => b.score - a.score);
+
+    const lastGame = allGames[allGames.length - 1];
+    const lastPlayerTotal = totalsByPlayer.get(lastGame.name);
     const formattedLastDate = new Date(lastGame.date).toLocaleString("ru-RU", {
       year: "numeric",
       month: "2-digit",
@@ -25,11 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
       minute: "2-digit",
     });
 
-    currentBlock.textContent =
-      `Последняя игра: ${lastGame.name}, очки: ${lastGame.score}, ` +
-      `уровень: ${LEVEL_NAMES[lastGame.level]}, дата: ${formattedLastDate}`;
-
-    const ratingSorted = allGames.slice().sort((a, b) => b.score - a.score);
+    currentBlock.textContent = `Последняя игра: ${lastGame.name}, суммарный лучший результат: ${
+      lastPlayerTotal ? lastPlayerTotal.score : lastGame.score
+    }, дата: ${formattedLastDate}`;
 
     tbody.innerHTML = "";
 
@@ -59,9 +85,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const tdScore = document.createElement("td");
       tdScore.textContent = rec.score;
 
-      const tdLevel = document.createElement("td");
-      tdLevel.textContent = LEVEL_NAMES[rec.level] || rec.level;
-
       const tdDate = document.createElement("td");
       tdDate.textContent = new Date(rec.date).toLocaleString("ru-RU", {
         year: "numeric",
@@ -74,7 +97,6 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.appendChild(tdIndex);
       tr.appendChild(tdName);
       tr.appendChild(tdScore);
-      tr.appendChild(tdLevel);
       tr.appendChild(tdDate);
 
       tbody.appendChild(tr);
