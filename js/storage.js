@@ -77,7 +77,3 @@ function getBestScoreForLevel(levelId, mode) {
   }
   return best;
 }
-function setCurrentPlayerName(name) {
-  localStorage.setItem("currentPlayerName", name);
-  localStorage.removeItem("currentGame"); // сброс прогресса
-}

@@ -50,13 +50,11 @@ let endModal = null;
 let modalTitle = null;
 let modalText = null;
 let modalReplayBtn = null;
-let modalNextBtn = null;
 let modalLevelSelectBtn = null;
 let modalLeaderboardBtn = null;
 let roundSelectModal = null;
 let roundSelectList = null;
 let roundSelectCancel = null;
-let nextLevelToStart = null;
 let feedbackTimeoutId = null;
 let feedbackHideTimeoutId = null;
 let audioCtx = null;
@@ -188,7 +186,8 @@ function handleTimeExpired() {
 // инициализация страницы
 document.addEventListener("DOMContentLoaded", () => {
   let playerName = getCurrentPlayerName();
-  if (!playerName) {
+  const storedRaw = localStorage.getItem("currentPlayerName");
+  if (!storedRaw) {
     playerName = "Гость";
     localStorage.setItem("currentPlayerName", playerName);
   }
@@ -207,7 +206,6 @@ document.addEventListener("DOMContentLoaded", () => {
   modalTitle = document.getElementById("modal-title");
   modalText = document.getElementById("modal-text");
   modalReplayBtn = document.getElementById("modal-replay-btn");
-  modalNextBtn = document.getElementById("modal-next-btn");
   modalLevelSelectBtn = document.getElementById("modal-level-select-btn");
   modalLeaderboardBtn = document.getElementById("modal-leaderboard-btn");
   modalRoundsListEl = document.getElementById("modal-rounds-list");
@@ -226,14 +224,6 @@ document.addEventListener("DOMContentLoaded", () => {
     modalReplayBtn.addEventListener("click", () => {
       hideEndModal();
       showRoundSelectModal(currentLevelId, cloneRoundStates(roundStates));
-    });
-  }
-
-  if (modalNextBtn) {
-    modalNextBtn.addEventListener("click", () => {
-      if (!nextLevelToStart) return;
-      hideEndModal();
-      startLevel(nextLevelToStart, true, 1, currentGameMode);
     });
   }
 
@@ -273,10 +263,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initFloatingBackground();
 
   // показать заметки следопыта при первом заходе на страницу
-  const hasSeenInstruction = sessionStorage.getItem("seenInstructionModal");
+  const seenKey = `seenInstructionModal:${playerName || "guest"}`;
+  const hasSeenInstruction = sessionStorage.getItem(seenKey);
   if (!hasSeenInstruction) {
     showInstructionModal();
-    sessionStorage.setItem("seenInstructionModal", "1");
+    sessionStorage.setItem(seenKey, "1");
   }
 
   toggleHeaderStats(false);
@@ -477,9 +468,18 @@ function startLevel(
   } else {
     const saved = savedLevelProgress[progressKey];
     if (saved && saved.roundStates && saved.roundStates.length) {
-      roundStates = cloneRoundStates(saved.roundStates);
-      score = calculateScoreFromStates(roundStates);
-      currentRound = startFromRound;
+      const allCompleted = saved.roundStates.every(
+        (s) => s && s.result !== null
+      );
+      if (allCompleted) {
+        roundStates = [];
+        score = 0;
+        currentRound = startFromRound;
+      } else {
+        roundStates = cloneRoundStates(saved.roundStates);
+        score = calculateScoreFromStates(roundStates);
+        currentRound = startFromRound;
+      }
     } else {
       currentRound = 1;
       score = 0;
@@ -980,7 +980,7 @@ function viewCompletedRound(roundNumber) {
 }
 
 function handleSelectOption(element) {
-  if (roundLocked) return;
+  if (roundLocked || feedbackActive) return;
   document.querySelectorAll(".track-option").forEach((el) => {
     el.classList.remove("selected");
   });
@@ -988,7 +988,7 @@ function handleSelectOption(element) {
   selectedOptionId = element.dataset.id;
 }
 function handleConfirmOption(element) {
-  if (roundLocked) return;
+  if (roundLocked || feedbackActive) return;
   // В режиме лабиринта выбор подтверждается через onSuccess/onFail
   if (isMazeMode()) {
     return;
@@ -1011,6 +1011,7 @@ function handleConfirmOption(element) {
 function checkAnswer() {
   if (roundLocked) return;
   roundLocked = true;
+  feedbackActive = true;
   if (currentGameMode === "reaction") {
     resetReactionFlow();
   }
@@ -1072,30 +1073,6 @@ function showEndModal(reason, extra = {}) {
     modalText.textContent = `Вы набрали ${score} очков в режиме "${modeName}" на сложности "${levelName}". Бонус за прохождение в отведённое время: +${extra.timeBonus}.`;
   } else {
     modalText.textContent = `Вы набрали ${score} очков в режиме "${modeName}" на сложности "${levelName}".`;
-  }
-
-  // по умолчанию следующего уровня нет
-  nextLevelToStart = null;
-
-  const isLastLevel = currentLevelId === "hard";
-
-  if (modalNextBtn) {
-    if (isLastLevel) {
-      modalNextBtn.disabled = true;
-      modalNextBtn.classList.add("level-locked");
-      modalNextBtn.textContent = "Следующий уровень";
-      modalNextBtn.style.display = "none";
-    } else if (nextLevelToStart) {
-      modalNextBtn.disabled = false;
-      modalNextBtn.classList.remove("level-locked");
-      modalNextBtn.textContent = "Следующий уровень";
-      modalNextBtn.style.display = "inline-block";
-    } else {
-      modalNextBtn.disabled = true;
-      modalNextBtn.classList.add("level-locked");
-      modalNextBtn.textContent = "Следующий уровень недоступен";
-      modalNextBtn.style.display = "inline-block";
-    }
   }
 
   endModal.classList.remove("hidden");
